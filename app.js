@@ -4,8 +4,8 @@ const status_Created = 201;
 const status_BadRequest = 400;
 const status_NotFound = 404;
 
-
-// Product Module:
+/*
+// Product Object:
 let Product = {
     init: function (name, description, category, amount) {
         this.name = name || "N/A";
@@ -15,92 +15,123 @@ let Product = {
         return this;
     }
 }
+*/
+
+// Product class:
+class Product {
+    constructor(name, description, category, amount) {
+        this.name = name || "N/A";
+        this.description = description || "N/A";
+        this.category = category || "N/A";
+        this.amount = amount || 0;
+    }
+}
 
 
 // Product Manager Module:
-let ProductsManager = {
-    products: [],
-    amount: 0,
-    lastStatus: status_OK,
+let ProductsManager = (function() {
 
-    // Returns undefined in case added successfully, otherwise returns error reason.
-    addProduct: function (name, description, category, amount) {
-        let answer = (function(products, name, description, category, amount){
-            if (!name || !description || !category)
-                return 'Error: name, description and category are required.';
-            if (amount != undefined && amount < 0)
-                return 'Error: amount must be higher or equal to 0';
+    // Private area:
+    let products = [];
+    let amountOfProducts = 0;
+    let lastStatus = status_OK;
 
-            if ((function(products, name){
-                for (const product of products) {
-                    if (product.name === name)
-                        return true;
-                }
-                return false;
-            })(products, name))
-                return 'Error: product with this name already exists.';
-
-            return undefined;
-        }
-        )(this.products, name, description, category, amount);
-        if (!answer)
-        {
-            this.products.push(Object.create(Product).init(name, description, category, amount));
-            this.lastStatus = status_Created;
-            this.amount++;
-        }
-        else this.lastStatus = status_BadRequest;
-        return answer;
-    },
-
-    // Return undefined in case updated successfully, otherwise returns error reason.
-    updateAmount: function (name, newAmount) {
-        if (!name || !newAmount)
-        {
-            this.lastStatus = status_BadRequest;
-            return 'Error: name, new Amount are required.';
-        }
-
-        if (newAmount < 0){
-            this.lastStatus = status_BadRequest;
-            return 'Error: amount must be higher or equal to 0';
-        }
-
-        for (const product of this.products) {
-            if (product.name === name)
-            {
-                product.amount = newAmount;
-                this.lastStatus = status_OK;
-                return undefined;
+    // Finding name index and returns it. Returns -1 if not found.
+    function findNameIndex(name) {
+        for (let i = 0; i < amountOfProducts; i++) {
+            if (products[i].name === name) {
+                return i;
             }
         }
-        this.lastStatus = status_NotFound;
-        return 'Error: product not found.';
-    },
-
-    deleteProduct: function (name) {
-        if (!name)
-        {
-            this.lastStatus = status_BadRequest;
-            return 'Error: name is required.';
-        }
-
-        for (let i = 0; i < this.amount; i++)
-        {
-            if (this.products[i].name === name)
-            {
-                this.products[i] = this.products[this.amount - 1];
-                this.products.pop();
-                this.lastStatus = status_OK;
-                this.amount--;
-                return undefined;
-            }
-        }
-
-        this.lastStatus = status_NotFound;
-        return 'Error: product not found.';
+        return -1;
     }
-}
+
+
+
+    // Public area:
+    return {
+        // Returns last status
+        getLastStatus: function() {
+            return lastStatus;
+        },
+    
+        // Returns products array
+        getProducts: function () {
+            lastStatus = status_OK;
+            return products;
+        },
+
+        // Returns undefined in case added successfully, otherwise returns error reason.
+        addProduct: function (name, description, category, amount) {
+            let answer = (function(name, description, category, amount){
+                if (!name || !description || !category)
+                    return 'Error: name, description and category are required.';
+                if (amount != undefined && amount < 0)
+                    return 'Error: amount must be higher or equal to 0';
+    
+                if (findNameIndex(name) != -1)
+                    return 'Error: product with this name already exists.';
+    
+                return undefined;
+            })(name, description, category, amount);
+
+            if (!answer)
+            {
+                // products.push(Object.create(Product).init(name, description, category, amount)); // using object
+                products.push(new Product(name, description, category, amount));
+                lastStatus = status_Created;
+                amountOfProducts++;
+            }
+            else lastStatus = status_BadRequest;
+            return answer;
+        },
+    
+        // Return undefined in case updated successfully, otherwise returns error reason.
+        updateAmount: function (name, newAmount) {
+            if (!name || !newAmount)
+            {
+                lastStatus = status_BadRequest;
+                return 'Error: name, new Amount are required.';
+            }
+    
+            if (newAmount < 0) {
+                lastStatus = status_BadRequest;
+                return 'Error: amount must be higher or equal to 0';
+            }
+    
+            let productIndex = findNameIndex(name);
+            if (productIndex != -1) {
+                products[productIndex].amount = newAmount;
+                lastStatus = status_OK;
+                return undefined;
+            }
+
+            lastStatus = status_NotFound;
+            return 'Error: product not found.';
+        },
+    
+        // Return undefined in case updated successfully, otherwise returns error reason.
+        deleteProduct: function (name) {
+            if (!name)
+            {
+                lastStatus = status_BadRequest;
+                return 'Error: name is required.';
+            }
+    
+            let productIndex = findNameIndex(name);
+            if (productIndex != -1) {
+                products[productIndex] = products[amountOfProducts - 1];
+                products.pop;
+                lastStatus = status_OK;
+                amountOfProducts--;
+                return undefined;
+            }
+    
+            lastStatus = status_NotFound;
+            return 'Error: product not found.';
+        }
+    };
+})();
 
 
 // Get Data:
@@ -125,7 +156,7 @@ app.use(bodyParser.json());
 
 // Show all products
 app.get('/api/products', (req, res) => {
-    res.status(status_OK).json(ProductsManager.products);
+    res.status(ProductsManager.getLastStatus()).json(ProductsManager.getProducts());
 });
 
 
@@ -137,7 +168,7 @@ app.post('/api/products', (req, res) => {
     let answer = ProductsManager.addProduct(name, description, category, amount) || 
     `Product '${name}' with description '${description}' of category '${category}' has been added successfully with amount of '${amount || 0}'!`;
 
-    res.status(ProductsManager.lastStatus).json(answer);
+    res.status(ProductsManager.getLastStatus()).json(answer);
 });
 
 
@@ -148,7 +179,7 @@ app.put('/api/products/:name', (req, res) => {
     const newAmount = req.body.amount;
 
     let answer = ProductsManager.updateAmount(productName, newAmount) || `Product: '${productName}' amount has been updated successfully to '${newAmount}!'`;
-    res.status(ProductsManager.lastStatus).json(answer);
+    res.status(ProductsManager.getLastStatus()).json(answer);
   });
 
   
@@ -158,7 +189,7 @@ app.delete('/api/products/:name', (req, res) => {
     const productName = req.params.name;
 
     let answer = ProductsManager.deleteProduct(productName) || `Product: '${productName} has been deleted successfully!`;
-    res.status(ProductsManager.lastStatus).json(answer);
+    res.status(ProductsManager.getLastStatus()).json(answer);
   });
 
 
