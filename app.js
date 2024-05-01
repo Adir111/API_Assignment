@@ -32,14 +32,14 @@ class Product {
 let ProductsManager = (function() {
 
     // Private area:
-    let products = [];
-    let amountOfProducts = 0;
-    let lastStatus = status_OK;
+    let _products = [];
+    let _amountOfProducts = 0;
+    let _lastStatus = status_OK;
 
     // Finding name index and returns it. Returns -1 if not found.
     function findNameIndex(name) {
-        for (let i = 0; i < amountOfProducts; i++) {
-            if (products[i].name === name) {
+        for (let i = 0; i < _amountOfProducts; i++) {
+            if (_products[i].name === name) {
                 return i;
             }
         }
@@ -48,17 +48,17 @@ let ProductsManager = (function() {
 
 
 
-    // Public area:
+    // Public area - returned object:
     return {
         // Returns last status
         getLastStatus: function() {
-            return lastStatus;
+            return _lastStatus;
         },
     
         // Returns products array
         getProducts: function () {
-            lastStatus = status_OK;
-            return products;
+            _lastStatus = status_OK;
+            return _amountOfProducts == 0? "No products!" : _products;
         },
 
         // Returns undefined in case added successfully, otherwise returns error reason.
@@ -78,56 +78,59 @@ let ProductsManager = (function() {
             if (!answer)
             {
                 // products.push(Object.create(Product).init(name, description, category, amount)); // using object
-                products.push(new Product(name, description, category, amount));
-                lastStatus = status_Created;
-                amountOfProducts++;
+                _products.push(new Product(name, description, category, amount));
+                _lastStatus = status_Created;
+                _amountOfProducts++;
             }
-            else lastStatus = status_BadRequest;
+            else _lastStatus = status_BadRequest;
             return answer;
         },
     
         // Return undefined in case updated successfully, otherwise returns error reason.
         updateAmount: function (name, newAmount) {
-            if (!name || !newAmount)
-            {
-                lastStatus = status_BadRequest;
-                return 'Error: name, new Amount are required.';
-            }
-    
-            if (newAmount < 0) {
-                lastStatus = status_BadRequest;
-                return 'Error: amount must be higher or equal to 0';
-            }
-    
-            let productIndex = findNameIndex(name);
-            if (productIndex != -1) {
-                products[productIndex].amount = newAmount;
-                lastStatus = status_OK;
-                return undefined;
-            }
+            let answer = (function() {
+                if (!name || newAmount == undefined)
+                    return 'Error: name, new Amount are required.';
+        
+                if (newAmount < 0)
+                    return 'Error: amount must be higher or equal to 0';
 
-            lastStatus = status_NotFound;
-            return 'Error: product not found.';
+                    return undefined;
+            })();
+    
+            if (!answer) {
+                let productIndex = findNameIndex(name);
+                if (productIndex != -1) {
+                    _products[productIndex].amount = newAmount;
+                    _lastStatus = status_OK;
+                }
+                else {
+                    _lastStatus = status_NotFound;
+                    answer = 'Error: product not found.';
+                }
+            }
+            else _lastStatus = status_BadRequest;
+            return answer;
         },
     
         // Return undefined in case updated successfully, otherwise returns error reason.
         deleteProduct: function (name) {
             if (!name)
             {
-                lastStatus = status_BadRequest;
+                _lastStatus = status_BadRequest;
                 return 'Error: name is required.';
             }
     
             let productIndex = findNameIndex(name);
             if (productIndex != -1) {
-                products[productIndex] = products[amountOfProducts - 1];
-                products.pop;
-                lastStatus = status_OK;
-                amountOfProducts--;
+                _products[productIndex] = _products[_amountOfProducts - 1];
+                _products.pop();
+                _lastStatus = status_OK;
+                _amountOfProducts--;
                 return undefined;
             }
     
-            lastStatus = status_NotFound;
+            _lastStatus = status_NotFound;
             return 'Error: product not found.';
         }
     };
@@ -143,15 +146,11 @@ ProductsManager.addProduct("Keyboard", "Black, mech keyboard", "Electronics", 3)
 ProductsManager.addProduct("Mouse", "White simple mouse for pc", "Electroincs", 3);
 
 
-
-
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
 
 app.use(bodyParser.json());
-
 
 
 // Show all products
@@ -160,17 +159,14 @@ app.get('/api/products', (req, res) => {
 });
 
 
-
 // Add a new product
 app.post('/api/products', (req, res) => {
     const { name, description, category, amount } = req.body;
 
     let answer = ProductsManager.addProduct(name, description, category, amount) || 
     `Product '${name}' with description '${description}' of category '${category}' has been added successfully with amount of '${amount || 0}'!`;
-
     res.status(ProductsManager.getLastStatus()).json(answer);
 });
-
 
 
 // Update product amount
@@ -183,7 +179,6 @@ app.put('/api/products/:name', (req, res) => {
   });
 
   
-
 // Delete product
 app.delete('/api/products/:name', (req, res) => {
     const productName = req.params.name;
@@ -193,7 +188,6 @@ app.delete('/api/products/:name', (req, res) => {
   });
 
 
-  
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
