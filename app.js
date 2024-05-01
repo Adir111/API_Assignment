@@ -76,6 +76,29 @@ let ProductsManager = {
         }
         this.lastStatus = status_NotFound;
         return 'Error: product not found.';
+    },
+
+    deleteProduct: function (name) {
+        if (!name)
+        {
+            this.lastStatus = status_BadRequest;
+            return 'Error: name is required.';
+        }
+
+        for (let i = 0; i < this.amount; i++)
+        {
+            if (this.products[i].name === name)
+            {
+                this.products[i] = this.products[this.amount - 1];
+                this.products.pop();
+                this.lastStatus = status_OK;
+                this.amount--;
+                return undefined;
+            }
+        }
+
+        this.lastStatus = status_NotFound;
+        return 'Error: product not found.';
     }
 }
 
@@ -128,24 +151,14 @@ app.put('/api/products/:name', (req, res) => {
     res.status(ProductsManager.lastStatus).json(answer);
   });
 
-
-// STOPPED HERE
   
 
-  // DELETE endpoint to delete a specific to-do item
-app.delete('/api/products/:id', (req, res) => {
-    const todoId = req.params.id;
-    
-    // Find the index of the to-do item with the given ID
-    const index = todos.findIndex(todo => todo.id === todoId);
-    
-    // If the to-do item is found, delete it; otherwise, return a 404 Not Found
-    if (index !== -1) {
-      const deletedTodo = todos.splice(index, 1)[0];
-      res.json(deletedTodo);
-    } else {
-      res.status(404).json({ error: 'To-do item not found' });
-    }
+// Delete product
+app.delete('/api/products/:name', (req, res) => {
+    const productName = req.params.name;
+
+    let answer = ProductsManager.deleteProduct(productName) || `Product: '${productName} has been deleted successfully!`;
+    res.status(ProductsManager.lastStatus).json(answer);
   });
 
 
