@@ -44,7 +44,7 @@ export class ProductsManager {
         let _lastStatus = status_OK;
         ProductsManager.#instance = this;
 
-        // Collects data from db
+        // Collects data from DB into array
         (async () => {
             try {
                 const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
@@ -52,14 +52,16 @@ export class ProductsManager {
                 const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
                 _products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
                 _amountOfProducts = _products.length;
-                client.close;
             } catch (err) {
                 _lastStatus = status_InternalServerError;
                 if (err instanceof MongoError) {
                     return "MongoDB error: " + err.message;
                 } else {
                     return "Unexpected error with server: " + err.message;
-                }            }
+                }
+            } finally {
+                client.close;
+            }
         })();
 
         let findNameIndex = function(name) {
@@ -101,15 +103,11 @@ export class ProductsManager {
             })(name, description, category, amount);
             if (!answer)
             {
-                _products.push(new Product(name, description, category, amount));
-                _lastStatus = status_Created;
-                _amountOfProducts++;
-                (async () => {
+                (async () => { // Adding to DB
                     try { 
                         const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                         const db = client.db(databaseName);
                         await db.collection("products").insertOne(new Product(name, description, category, amount));
-                        client.close;
                     } catch (err) {
                         _lastStatus = status_InternalServerError;
                         if (err instanceof MongoError) {
@@ -117,8 +115,14 @@ export class ProductsManager {
                         } else {
                             return "Unexpected error with server: " + err.message;
                         }
+                    } finally {
+                        client.close;
                     }
                 })();
+
+                _products.push(new Product(name, description, category, amount)); // Adding to array
+                _lastStatus = status_Created;
+                _amountOfProducts++;
             }
             else _lastStatus = status_BadRequest;
             return answer;
@@ -141,14 +145,13 @@ export class ProductsManager {
             if (!answer) {
                 let productIndex = findNameIndex(name);
                 if (productIndex != -1) {
-                    (async () => {
+                    (async () => { // Updating in DB
                         try { 
                             const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                             const db = client.db(databaseName);
                             const query = { name: name };
                             const updatedProduct = { $set: { amount: newAmount }};
                             await db.collection("products").updateOne(query, updatedProduct);
-                            client.close;
                         } catch (err) {
                             _lastStatus = status_InternalServerError;
                             if (err instanceof MongoError) {
@@ -156,9 +159,11 @@ export class ProductsManager {
                             } else {
                                 return "Unexpected error with server: " + err.message;
                             }
+                        } finally {
+                            client.close;
                         }
                     })();
-                    _products[productIndex].amount = newAmount;
+                    _products[productIndex].amount = newAmount; // Updates array
                     _lastStatus = status_OK;
                 }
                 else {
@@ -178,10 +183,27 @@ export class ProductsManager {
                 _lastStatus = status_BadRequest;
                 return 'Error: name is required.';
             }
-    
+
             let productIndex = findNameIndex(name);
             if (productIndex != -1) {
-                _products[productIndex] = _products[_amountOfProducts - 1];
+                (async () => { // Deleting from DB
+                    try { 
+                        const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                        const db = client.db(databaseName);
+                        const query = { name: name };
+                        const result = await db.collection("products").deleteOne(query);
+                    } catch (err) {
+                        _lastStatus = status_InternalServerError;
+                        if (err instanceof MongoError) {
+                            return "MongoDB error: " + err.message;
+                        } else {
+                            return "Unexpected error with server: " + err.message;
+                        }
+                    } finally {
+                        client.close;
+                    }
+                })();
+                _products[productIndex] = _products[_amountOfProducts - 1]; // Deleting from array
                 _products.pop();
                 _lastStatus = status_OK;
                 _amountOfProducts--;
