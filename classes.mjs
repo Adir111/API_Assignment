@@ -55,8 +55,11 @@ export class ProductsManager {
                 client.close;
             } catch (err) {
                 _lastStatus = status_InternalServerError;
-                throw err;
-            }
+                if (err instanceof MongoError) {
+                    return "MongoDB error: " + err.message;
+                } else {
+                    return "Unexpected error with server: " + err.message;
+                }            }
         })();
 
         let findNameIndex = function(name) {
@@ -106,9 +109,14 @@ export class ProductsManager {
                         const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                         const db = client.db(databaseName);
                         await db.collection("products").insertOne(new Product(name, description, category, amount));
+                        client.close;
                     } catch (err) {
                         _lastStatus = status_InternalServerError;
-                        throw err;
+                        if (err instanceof MongoError) {
+                            return "MongoDB error: " + err.message;
+                        } else {
+                            return "Unexpected error with server: " + err.message;
+                        }
                     }
                 })();
             }
@@ -133,25 +141,23 @@ export class ProductsManager {
             if (!answer) {
                 let productIndex = findNameIndex(name);
                 if (productIndex != -1) {
-                    MongoClient.connect(mongoUrlLocal, mongoClientOptions, function (err, client) {
-                        if (err) {
+                    (async () => {
+                        try { 
+                            const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                            const db = client.db(databaseName);
+                            const query = { name: name };
+                            const updatedProduct = { $set: { amount: newAmount }};
+                            await db.collection("products").updateOne(query, updatedProduct);
+                            client.close;
+                        } catch (err) {
                             _lastStatus = status_InternalServerError;
-                            throw err;
+                            if (err instanceof MongoError) {
+                                return "MongoDB error: " + err.message;
+                            } else {
+                                return "Unexpected error with server: " + err.message;
+                            }
                         }
-                    
-                        let db = client.db(databaseName);
-                        let myquery = { name: name };
-                        let newProduct = { $set: { amount: newAmount } };
-                    
-                        db.collection("products").updateOne({myquery}, newProduct, {upsert: true}, function(err, res) {
-                        if (err) {
-                            _lastStatus = status_InternalServerError;
-                            throw err;
-                        }
-                          client.close();
-                        });
-                      });
-
+                    })();
                     _products[productIndex].amount = newAmount;
                     _lastStatus = status_OK;
                 }
