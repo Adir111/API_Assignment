@@ -10,6 +10,16 @@ export class Product {
 import pkg from 'mongodb';
 const { MongoClient } = pkg;
 
+// use when starting application locally
+let mongoUrlLocal = "mongodb://admin:password@localhost:27017";
+// use when starting application as docker container
+// let mongoUrlDocker = "mongodb://admin:password@mongodb";
+
+// pass these options to mongo client connect request to avoid DeprecationWarning for current Server Discovery and Monitoring engine
+let mongoClientOptions = { useNewUrlParser: true, useUnifiedTopology: true };
+
+let databaseName = "my-db";
+
 
 // Status numbers:
 const status_OK = 200;
@@ -18,20 +28,9 @@ const status_BadRequest = 400;
 const status_NotFound = 404;
 const status_InternalServerError = 500;
 
-// use when starting application locally
-let mongoUrlLocal = "mongodb://admin:password@localhost:27017";
-
-// use when starting application as docker container
-// let mongoUrlDocker = "mongodb://admin:password@mongodb";
-
-// pass these options to mongo client connect request to avoid DeprecationWarning for current Server Discovery and Monitoring engine
-let mongoClientOptions = { useNewUrlParser: true, useUnifiedTopology: true };
-
-// "user-account" in demo with docker. "my-db" in demo with docker-compose
-let databaseName = "my-db";
 
 
-
+// Singleton class used for managing products. Using mongodb docker to save data.
 export class ProductsManager {
     static #instance = null;
 
@@ -44,6 +43,21 @@ export class ProductsManager {
         let _amountOfProducts = 0;
         let _lastStatus = status_OK;
         ProductsManager.#instance = this;
+
+        // Collects data from db
+        (async () => {
+            try {
+                const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                const db = client.db(databaseName);
+                const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
+                _products = results;
+                _amountOfProducts = _products.length;
+                client.close;
+            } catch (err) {
+                _lastStatus = status_InternalServerError;
+                throw err;
+            }
+        })();
 
         let findNameIndex = function(name) {
             for (let i = 0; i < _amountOfProducts; i++) {
@@ -60,36 +74,15 @@ export class ProductsManager {
         }
 
 
+
+
+
+        // Returns all products
         this.getProducts = function() {
-            if (_products == []) {
-                MongoClient.connect(mongoUrlLocal, mongoClientOptions, function (err, client) {
-                    if (err) {
-                        _lastStatus = status_InternalServerError;
-                        throw err;
-                    }
-
-                    let db = client.db(databaseName);
-
-
-                    db.collection("products").find({}).toArray(function (err, results) {
-                        if (err) {
-                            _lastStatus = status_InternalServerError;
-                            throw err;
-                        }
-                        response = results;
-                        client.close();
-                    });
-                });
-
-                response.forEach(product => {
-                    let { name, description, category, amount } = product;
-                    manager.addProduct(name, description, category, amount);
-                });
-            }
-
             _lastStatus = status_OK;
             return _amountOfProducts == 0? "No products!" : _products;
         }
+
 
 
         // Returns undefined in case added successfully, otherwise returns error reason.
@@ -109,24 +102,27 @@ export class ProductsManager {
             if (!answer)
             {
                 MongoClient.connect(mongoUrlLocal, mongoClientOptions, function (err, client) {
-                    if (err) throw err;
+                    if (err) {
+                        _lastStatus = status_InternalServerError;
+                        throw err;
+                    }
                 
-                    let db = client.db(databaseName);
                     let productObj = {
                         name: name,
                         description: description,
                         category: category,
                         amount: amount
                     };
+                    let db = client.db(databaseName);
+                    let newProduct = { $set: productObj };
                 
-                    let myquery = { name: name };
-                    let newvalues = { $set: productObj };
-                
-                    db.collection("products").updateOne(myquery, newvalues, {upsert: true}, function(err, res) {
-                      if (err) throw err;
+                    db.collection("products").insertOne(newProduct, function(err, res) {
+                        if (err) {
+                            _lastStatus = status_InternalServerError;
+                            throw err;
+                        }
                       client.close();
                     });
-                
                   });
                   
                 _products.push(new Product(name, description, category, amount));
@@ -136,6 +132,7 @@ export class ProductsManager {
             else _lastStatus = status_BadRequest;
             return answer;
         }
+
 
 
         // Return undefined in case updated successfully, otherwise returns error reason.
@@ -153,6 +150,25 @@ export class ProductsManager {
             if (!answer) {
                 let productIndex = findNameIndex(name);
                 if (productIndex != -1) {
+                    MongoClient.connect(mongoUrlLocal, mongoClientOptions, function (err, client) {
+                        if (err) {
+                            _lastStatus = status_InternalServerError;
+                            throw err;
+                        }
+                    
+                        let db = client.db(databaseName);
+                        let myquery = { name: name };
+                        let newProduct = { $set: { amount: newAmount } };
+                    
+                        db.collection("products").updateOne({myquery}, newProduct, {upsert: true}, function(err, res) {
+                        if (err) {
+                            _lastStatus = status_InternalServerError;
+                            throw err;
+                        }
+                          client.close();
+                        });
+                      });
+
                     _products[productIndex].amount = newAmount;
                     _lastStatus = status_OK;
                 }
