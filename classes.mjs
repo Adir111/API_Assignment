@@ -50,7 +50,7 @@ export class ProductsManager {
                 const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                 const db = client.db(databaseName);
                 const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
-                _products = results;
+                _products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
                 _amountOfProducts = _products.length;
                 client.close;
             } catch (err) {
@@ -75,8 +75,6 @@ export class ProductsManager {
 
 
 
-
-
         // Returns all products
         this.getProducts = function() {
             _lastStatus = status_OK;
@@ -98,36 +96,21 @@ export class ProductsManager {
     
                 return undefined;
             })(name, description, category, amount);
-
             if (!answer)
             {
-                MongoClient.connect(mongoUrlLocal, mongoClientOptions, function (err, client) {
-                    if (err) {
-                        _lastStatus = status_InternalServerError;
-                        throw err;
-                    }
-                
-                    let productObj = {
-                        name: name,
-                        description: description,
-                        category: category,
-                        amount: amount
-                    };
-                    let db = client.db(databaseName);
-                    let newProduct = { $set: productObj };
-                
-                    db.collection("products").insertOne(newProduct, function(err, res) {
-                        if (err) {
-                            _lastStatus = status_InternalServerError;
-                            throw err;
-                        }
-                      client.close();
-                    });
-                  });
-                  
                 _products.push(new Product(name, description, category, amount));
                 _lastStatus = status_Created;
                 _amountOfProducts++;
+                (async () => {
+                    try { 
+                        const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                        const db = client.db(databaseName);
+                        await db.collection("products").insertOne(new Product(name, description, category, amount));
+                    } catch (err) {
+                        _lastStatus = status_InternalServerError;
+                        throw err;
+                    }
+                })();
             }
             else _lastStatus = status_BadRequest;
             return answer;
