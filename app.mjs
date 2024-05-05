@@ -2,28 +2,10 @@ import { Product, ProductsManager } from './classes.mjs';
 import express from 'express';
 import bodyParser from 'body-parser';
 
-import pkg from 'mongodb';
-const { MongoClient } = pkg;
-
 
 const app = express();
 app.use(bodyParser.json());
 let manager = new ProductsManager();
-
-// Get Data:
-/*
-manager.addProduct("Chair", "A chair for your kitchen", "Furniture", 25);
-manager.addProduct("Table", "A nice looking table", "Kitchen", 3);
-manager.addProduct("Sofa", "White big comfy sofa!", "Living room", 2);
-manager.addProduct("Computer", "16GB RAM, OS Windows 10 Proffesional, i7, 1TB SSD", "Electronics", 1);
-manager.addProduct("Keyboard", "Black, mech keyboard", "Electronics", 3);
-manager.addProduct("Mouse", "White simple mouse for pc", "Electroincs", 3);
-*/
-
-
-
-
-
 
 
 // Show all products
