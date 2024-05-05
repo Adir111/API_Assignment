@@ -20,7 +20,7 @@ app.use(bodyParser.json());
 
 // Show all products
 app.get('/api/products', (req, res) => {
-    res.status(manager2.getLastStatus()).json(manager2.getProducts());
+    res.status(manager.getLastStatus()).json(manager.getProducts());
 });
 
 
