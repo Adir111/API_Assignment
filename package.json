@@ -2,7 +2,7 @@
   "name": "assignment-rest-api",
   "version": "1.0.0",
   "description": "REST API built with Node.js and Express for products managment",
-  "main": "app.js",
+  "main": "app.mjs",
   "scripts": {
     "start": "nodemon app.js"
   },

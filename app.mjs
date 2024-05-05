@@ -4,29 +4,8 @@ const status_Created = 201;
 const status_BadRequest = 400;
 const status_NotFound = 404;
 
-/*
-// Product Object:
-let Product = {
-    init: function (name, description, category, amount) {
-        this.name = name || "N/A";
-        this.description = description || "N/A";
-        this.category = category || "N/A";
-        this.amount = amount || 0;
-        return this;
-    }
-}
-*/
-
-// Product class:
-class Product {
-    constructor(name, description, category, amount) {
-        this.name = name || "N/A";
-        this.description = description || "N/A";
-        this.category = category || "N/A";
-        this.amount = amount || 0;
-    }
-}
-
+// Imports:
+import { Product } from './classes.mjs';
 
 // Product Manager Module:
 let ProductsManager = (function() {
@@ -146,8 +125,8 @@ ProductsManager.addProduct("Keyboard", "Black, mech keyboard", "Electronics", 3)
 ProductsManager.addProduct("Mouse", "White simple mouse for pc", "Electroincs", 3);
 
 
-const express = require('express');
-const bodyParser = require('body-parser');
+import express from 'express';
+import bodyParser from 'body-parser';
 const app = express();
 
 app.use(bodyParser.json());
