@@ -7,6 +7,9 @@ export class Product {
     }
 }
 
+import pkg from 'mongodb';
+const { MongoClient } = pkg;
+
 
 // Status numbers:
 const status_OK = 200;
@@ -105,6 +108,27 @@ export class ProductsManager {
 
             if (!answer)
             {
+                MongoClient.connect(mongoUrlLocal, mongoClientOptions, function (err, client) {
+                    if (err) throw err;
+                
+                    let db = client.db(databaseName);
+                    let productObj = {
+                        name: name,
+                        description: description,
+                        category: category,
+                        amount: amount
+                    };
+                
+                    let myquery = { name: name };
+                    let newvalues = { $set: productObj };
+                
+                    db.collection("products").updateOne(myquery, newvalues, {upsert: true}, function(err, res) {
+                      if (err) throw err;
+                      client.close();
+                    });
+                
+                  });
+                  
                 _products.push(new Product(name, description, category, amount));
                 _lastStatus = status_Created;
                 _amountOfProducts++;
