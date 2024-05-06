@@ -83,7 +83,7 @@ export class ProductsManager {
 
         // Returns all products
         this.getProducts = async function() {
-            let client = undefined;
+            let client;
             try {
                 client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                 const db = client.db(databaseName);
@@ -109,7 +109,6 @@ export class ProductsManager {
         // Returns undefined in case added successfully, otherwise returns error reason.
         this.addProduct = async function(name, description, category, amount) {
             let client;
-    
             try {
                 if (!name || !description || !category) {
                     _lastStatus = status_BadRequest;
@@ -153,7 +152,6 @@ export class ProductsManager {
         // Return undefined in case updated successfully, otherwise returns error reason.
         this.updateAmount = async function(name, newAmount) {
             let client;
-
             try {
                 if (!name || newAmount == undefined) {
                     _lastStatus = status_BadRequest;
