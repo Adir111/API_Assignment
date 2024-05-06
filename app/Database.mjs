@@ -9,7 +9,7 @@ export const Database = {
             amount: { bsonType: 'number' }
         }
     },
-    mongoUrl: "mongodb://admin:password@localhost:27017",
+    mongoUrl: "mongodb://admin:password@mongodb",
     mongoClientOptions: { useNewUrlParser: true, useUnifiedTopology: true },
     databaseName: "my-db"
 }
