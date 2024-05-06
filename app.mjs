@@ -1,4 +1,4 @@
-import { Product, ProductsManager } from './classes.mjs';
+import { ProductsManager } from './classes.mjs';
 import express from 'express';
 import bodyParser from 'body-parser';
 
