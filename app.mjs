@@ -1,11 +1,11 @@
-import { ProductsManager } from './ProductManager.mjs';
+//import manager from './ProductManager.mjs';
+import { manager  } from './ProductManager.mjs';
 import express from 'express';
 import bodyParser from 'body-parser';
 
 
 const app = express();
 app.use(bodyParser.json());
-const manager = new ProductsManager();
 
 
 // Show all products

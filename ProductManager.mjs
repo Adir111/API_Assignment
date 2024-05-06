@@ -6,20 +6,10 @@ const { MongoClient, MongoError } = pkg;
 
 
 // Singleton class used for managing products. Using mongodb docker to save data.
-export class ProductsManager {
-    static #instance = null;
-
-    static getInstance() {
-        return ProductsManager.#instance ? ProductsManager.#instance : new ProductsManager();
-    }
+class ProductsManager {
 
     constructor() {
-        if (ProductsManager.#instance) {
-            throw new Error("Singleton: Can't create more then 1 instance! Use GetInstance instead.")
-        }
-        
         let _lastStatus = Status.OK;
-        ProductsManager.#instance = this;
 
         (async () => {
         const client = new MongoClient(Database.mongoUrl, Database.mongoClientOptions);
@@ -189,3 +179,7 @@ export class ProductsManager {
         }
     }  
 }
+
+const manager = new ProductsManager();
+//export default manager;
+export { manager };
