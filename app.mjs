@@ -9,10 +9,11 @@ let manager = new ProductsManager();
 
 
 // Show all products
-app.get('/api/products', (req, res) => {
-
-    res.status(manager.getLastStatus()).json(manager.getProducts());
+app.get('/api/products', async (req, res) => {
+  const products = await manager.getProducts();
+  res.status(manager.getLastStatus()).json(products);
 });
+
 
 
 // Add a new product

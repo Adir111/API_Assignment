@@ -8,7 +8,9 @@ export class Product {
 }
 
 import pkg from 'mongodb';
-const { MongoClient } = pkg;
+const { MongoClient, MongoError } = pkg;
+
+
 
 // use when starting application locally
 let mongoUrlLocal = "mongodb://admin:password@localhost:27017";
@@ -34,39 +36,21 @@ const status_InternalServerError = 500;
 export class ProductsManager {
     static #instance = null;
 
+    static getInstance() {
+        return ProductsManager.#instance ? ProductsManager.#instance : new ProductsManager();
+    }
+
     constructor() {
         if (ProductsManager.#instance) {
-            return ProductsManager.#instance;
+            throw new Error("Singleton: Can't create more then 1 instance! Use GetInstance instead.")
         }
         
-        let _products = [];
-        let _amountOfProducts = 0;
         let _lastStatus = status_OK;
         ProductsManager.#instance = this;
 
-        // Collects data from DB into array
-        (async () => {
-            try {
-                const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                const db = client.db(databaseName);
-                const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
-                _products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
-                _amountOfProducts = _products.length;
-            } catch (err) {
-                _lastStatus = status_InternalServerError;
-                if (err instanceof MongoError) {
-                    return "MongoDB error: " + err.message;
-                } else {
-                    return "Unexpected error with server: " + err.message;
-                }
-            } finally {
-                client.close;
-            }
-        })();
-
-        let findNameIndex = function(name) {
-            for (let i = 0; i < _amountOfProducts; i++) {
-                if (_products[i].name === name) {
+        let findNameIndex = function(products, name) {
+            for (let i = 0; i < products.length; i++) {
+                if (products[i].name === name) {
                     return i;
                 }
             }
@@ -81,9 +65,24 @@ export class ProductsManager {
 
 
         // Returns all products
-        this.getProducts = function() {
-            _lastStatus = status_OK;
-            return _amountOfProducts == 0? "No products!" : _products;
+        this.getProducts = async function() {
+            try {
+                const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                const db = client.db(databaseName);
+                _lastStatus = status_OK;
+                const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
+                const products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
+                return products.length == 0? "No products available." : products;
+                client.close;
+            } catch (err) {
+                _lastStatus = status_InternalServerError;
+                console.log(err);
+                if (err instanceof MongoError) {
+                    return "MongoDB error: " + err.message;
+                } else {
+                    return "Unexpected error: " + err.message;
+                }
+            }
         }
 
 
@@ -96,7 +95,7 @@ export class ProductsManager {
                 if (amount != undefined && amount < 0)
                     return 'Error: amount must be higher or equal to 0';
     
-                if (findNameIndex(name) != -1)
+                if (findNameIndex(this.getProducts(), name) != -1)
                     return 'Error: product with this name already exists.';
     
                 return undefined;
@@ -119,10 +118,7 @@ export class ProductsManager {
                         client.close;
                     }
                 })();
-
-                _products.push(new Product(name, description, category, amount)); // Adding to array
                 _lastStatus = status_Created;
-                _amountOfProducts++;
             }
             else _lastStatus = status_BadRequest;
             return answer;
@@ -143,7 +139,7 @@ export class ProductsManager {
             })();
     
             if (!answer) {
-                let productIndex = findNameIndex(name);
+                let productIndex = findNameIndex(this.getProducts(), name);
                 if (productIndex != -1) {
                     (async () => { // Updating in DB
                         try { 
@@ -163,7 +159,6 @@ export class ProductsManager {
                             client.close;
                         }
                     })();
-                    _products[productIndex].amount = newAmount; // Updates array
                     _lastStatus = status_OK;
                 }
                 else {
@@ -184,7 +179,7 @@ export class ProductsManager {
                 return 'Error: name is required.';
             }
 
-            let productIndex = findNameIndex(name);
+            let productIndex = findNameIndex(this.getProducts(), name);
             if (productIndex != -1) {
                 (async () => { // Deleting from DB
                     try { 
@@ -203,13 +198,9 @@ export class ProductsManager {
                         client.close;
                     }
                 })();
-                _products[productIndex] = _products[_amountOfProducts - 1]; // Deleting from array
-                _products.pop();
                 _lastStatus = status_OK;
-                _amountOfProducts--;
                 return undefined;
             }
-    
             _lastStatus = status_NotFound;
             return 'Error: product not found.';
         }
