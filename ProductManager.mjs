@@ -181,5 +181,5 @@ class ProductsManager {
 }
 
 const manager = new ProductsManager();
-//export default manager;
+//export default whatevername;
 export { manager };
