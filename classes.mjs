@@ -10,6 +10,17 @@ export class Product {
 import pkg from 'mongodb';
 const { MongoClient, MongoError } = pkg;
 
+// Define schema
+const productsSchema = {
+    title: 'products',
+    required: ['name', 'description', 'category'],
+    properties: {
+        name: { bsonType: 'string' },
+        description: { bsonType: 'string' },
+        category: { bsonType: 'string' },
+        amount: { bsonType: 'number' }
+    }
+}; 
 
 
 // use when starting application locally
@@ -48,161 +59,173 @@ export class ProductsManager {
         let _lastStatus = status_OK;
         ProductsManager.#instance = this;
 
-        let findNameIndex = function(products, name) {
-            for (let i = 0; i < products.length; i++) {
-                if (products[i].name === name) {
-                    return i;
+        (async () => {
+        const client = new MongoClient(mongoUrlLocal, mongoClientOptions);
+        try {
+            await client.connect();
+            const db = client.db(databaseName);
+            await db.createCollection('products', {
+                validator: {
+                    $jsonSchema: productsSchema
                 }
-            }
-            return -1;
+            });
+        } catch (err) {
+            console.error("Error creating products schema: ", err);
+        } finally {
+            await client.close();
         }
-
-
+        })();
          this.getLastStatus = function() {
             return _lastStatus;
         }
 
-
+        
 
         // Returns all products
         this.getProducts = async function() {
+            let client = undefined;
             try {
-                const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                 const db = client.db(databaseName);
                 _lastStatus = status_OK;
                 const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
                 const products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
-                return products.length == 0? "No products available." : products;
-                client.close;
+                return products;
             } catch (err) {
                 _lastStatus = status_InternalServerError;
-                console.log(err);
+                console.error("Error occured: ", err);
                 if (err instanceof MongoError) {
                     return "MongoDB error: " + err.message;
                 } else {
                     return "Unexpected error: " + err.message;
                 }
+            } finally {
+                if (client) client.close();
             }
         }
 
 
 
         // Returns undefined in case added successfully, otherwise returns error reason.
-        this.addProduct = function(name, description, category, amount) {
-            let answer = (function(name, description, category, amount){
-                if (!name || !description || !category)
-                    return 'Error: name, description and category are required.';
-                if (amount != undefined && amount < 0)
-                    return 'Error: amount must be higher or equal to 0';
+        this.addProduct = async function(name, description, category, amount) {
+            let client;
     
-                if (findNameIndex(this.getProducts(), name) != -1)
+            try {
+                if (!name || !description || !category) {
+                    _lastStatus = status_BadRequest;
+                    return 'Error: name, description, and category are required.';
+                }
+                if (amount != undefined && amount < 0) {
+                    _lastStatus = status_BadRequest;
+                    return 'Error: amount must be higher or equal to 0';
+                }
+                
+                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                const db = client.db(databaseName);
+                const collection = db.collection("products");
+
+                const productExists = await collection.findOne({ name: name });
+                if (productExists) {
+                    _lastStatus = status_BadRequest;
                     return 'Error: product with this name already exists.';
-    
-                return undefined;
-            })(name, description, category, amount);
-            if (!answer)
-            {
-                (async () => { // Adding to DB
-                    try { 
-                        const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                        const db = client.db(databaseName);
-                        await db.collection("products").insertOne(new Product(name, description, category, amount));
-                    } catch (err) {
-                        _lastStatus = status_InternalServerError;
-                        if (err instanceof MongoError) {
-                            return "MongoDB error: " + err.message;
-                        } else {
-                            return "Unexpected error with server: " + err.message;
-                        }
-                    } finally {
-                        client.close;
-                    }
-                })();
-                _lastStatus = status_Created;
+                } 
+                await collection.insertOne(new Product(name, description, category, amount));
+
+            } catch (err) {
+                _lastStatus = status_InternalServerError;
+                console.error("Error occured: ", err);
+                if (err instanceof MongoError) {
+                    answer = "MongoDB error: " + err.message;
+                } else {
+                    answer = "Unexpected error with server: " + err.message;
+                }
+            } finally {
+                if (client) {
+                    client.close();
+                }
             }
-            else _lastStatus = status_BadRequest;
-            return answer;
+            _lastStatus = status_Created;
+            return undefined;
         }
 
 
 
         // Return undefined in case updated successfully, otherwise returns error reason.
-        this.updateAmount = function(name, newAmount) {
-            let answer = (function() {
-                if (!name || newAmount == undefined)
-                    return 'Error: name, new Amount are required.';
-        
-                if (newAmount < 0)
+        this.updateAmount = async function(name, newAmount) {
+            let client;
+
+            try {
+                if (!name || newAmount == undefined) {
+                    _lastStatus = status_BadRequest;
+                    return 'Error: name and amount are required.';
+                }
+                if (newAmount != undefined && newAmount < 0) {
+                    _lastStatus = status_BadRequest;
                     return 'Error: amount must be higher or equal to 0';
+                }
 
-                    return undefined;
-            })();
-    
-            if (!answer) {
-                let productIndex = findNameIndex(this.getProducts(), name);
-                if (productIndex != -1) {
-                    (async () => { // Updating in DB
-                        try { 
-                            const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                            const db = client.db(databaseName);
-                            const query = { name: name };
-                            const updatedProduct = { $set: { amount: newAmount }};
-                            await db.collection("products").updateOne(query, updatedProduct);
-                        } catch (err) {
-                            _lastStatus = status_InternalServerError;
-                            if (err instanceof MongoError) {
-                                return "MongoDB error: " + err.message;
-                            } else {
-                                return "Unexpected error with server: " + err.message;
-                            }
-                        } finally {
-                            client.close;
-                        }
-                    })();
-                    _lastStatus = status_OK;
-                }
-                else {
+                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                const db = client.db(databaseName);
+                const query = { name: name };
+                const updatedProduct = { $set: { amount: newAmount }};
+
+                const { matchedCount } = await db.collection("products").updateOne(query, updatedProduct);
+                if (matchedCount === 0) {
                     _lastStatus = status_NotFound;
-                    answer = 'Error: product not found.';
+                    return 'Error: product not found.';
                 }
+
+            } catch (err) {
+                _lastStatus = status_InternalServerError;
+                console.error("Error occured: ", err);
+                if (err instanceof MongoError) {
+                    return "MongoDB error: " + err.message;
+                } else {
+                    return "Unexpected error with server: " + err.message;
+                }
+            } finally {
+                if (client) {
+                    client.close();
+                }                
             }
-            else _lastStatus = status_BadRequest;
-            return answer;
+            _lastStatus = status_OK;
+            return undefined;
         }
 
 
         // Return undefined in case updated successfully, otherwise returns error reason.
-        this.deleteProduct = function(name) {
-            if (!name)
-            {
-                _lastStatus = status_BadRequest;
-                return 'Error: name is required.';
-            }
+        this.deleteProduct = async function(name) {
+            let client;
+            try
+            { 
+                if (!name)
+                {
+                    _lastStatus = status_BadRequest;
+                    return 'Error: product name is required.';
+                }
 
-            let productIndex = findNameIndex(this.getProducts(), name);
-            if (productIndex != -1) {
-                (async () => { // Deleting from DB
-                    try { 
-                        const client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                        const db = client.db(databaseName);
-                        const query = { name: name };
-                        const result = await db.collection("products").deleteOne(query);
-                    } catch (err) {
-                        _lastStatus = status_InternalServerError;
-                        if (err instanceof MongoError) {
-                            return "MongoDB error: " + err.message;
-                        } else {
-                            return "Unexpected error with server: " + err.message;
-                        }
-                    } finally {
-                        client.close;
-                    }
-                })();
-                _lastStatus = status_OK;
-                return undefined;
-            }
-            _lastStatus = status_NotFound;
-            return 'Error: product not found.';
+                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
+                const db = client.db(databaseName);
+                const query = { name: name };
+                const { deletedCount } = await db.collection("products").deleteOne(query);
+                if (deletedCount === 0) {
+                    _lastStatus = status_NotFound;
+                    return 'Error: product not found.';
+                }
+            } catch (err) {
+                _lastStatus = status_InternalServerError;
+                console.error("Error occured: ", err);
+                if (err instanceof MongoError) {
+                    return "MongoDB error: " + err.message;
+                } else {
+                    return "Unexpected error with server: " + err.message;
+                }
+            } finally {
+                if (client) {
+                    client.close();
+                }                }
+            _lastStatus = status_OK;
+            return undefined;
         }
     }  
 }
