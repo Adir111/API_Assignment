@@ -1,30 +1,8 @@
 import { Product } from './Product.mjs';
 import { Status } from './Status.mjs';
+import { Database } from './Database.mjs'
 import pkg from 'mongodb';
 const { MongoClient, MongoError } = pkg;
-
-// Define schema
-const productsSchema = {
-    title: 'products',
-    required: ['name', 'description', 'category'],
-    properties: {
-        name: { bsonType: 'string' },
-        description: { bsonType: 'string' },
-        category: { bsonType: 'string' },
-        amount: { bsonType: 'number' }
-    }
-}; 
-
-
-// use when starting application locally
-let mongoUrlLocal = "mongodb://admin:password@localhost:27017";
-// use when starting application as docker container
-// let mongoUrlDocker = "mongodb://admin:password@mongodb";
-
-// pass these options to mongo client connect request to avoid DeprecationWarning for current Server Discovery and Monitoring engine
-let mongoClientOptions = { useNewUrlParser: true, useUnifiedTopology: true };
-
-let databaseName = "my-db";
 
 
 // Singleton class used for managing products. Using mongodb docker to save data.
@@ -44,13 +22,13 @@ export class ProductsManager {
         ProductsManager.#instance = this;
 
         (async () => {
-        const client = new MongoClient(mongoUrlLocal, mongoClientOptions);
+        const client = new MongoClient(Database.mongoUrl, Database.mongoClientOptions);
         try {
             await client.connect();
-            const db = client.db(databaseName);
-            await db.createCollection('products', {
+            const db = client.db(Database.databaseName);
+            await db.createCollection(Database.productsSchema.title, {
                 validator: {
-                    $jsonSchema: productsSchema
+                    $jsonSchema: Database.productsSchema
                 }
             });
         } catch (err) {
@@ -69,10 +47,10 @@ export class ProductsManager {
         this.getProducts = async function() {
             let client;
             try {
-                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                const db = client.db(databaseName);
+                client = await MongoClient.connect(Database.mongoUrl, Database.mongoClientOptions);
+                const db = client.db(Database.databaseName);
                 _lastStatus = Status.OK;
-                const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
+                const results = await db.collection(Database.productsSchema.title).find({}, { projection: { _id: 0 } }).toArray();
                 const products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
                 return products;
             } catch (err) {
@@ -103,9 +81,9 @@ export class ProductsManager {
                     return 'Error: amount must be higher or equal to 0';
                 }
                 
-                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                const db = client.db(databaseName);
-                const collection = db.collection("products");
+                client = await MongoClient.connect(Database.mongoUrl, Database.mongoClientOptions);
+                const db = client.db(Database.databaseName);
+                const collection = db.collection(Database.productsSchema.title);
 
                 const productExists = await collection.findOne({ name: name });
                 if (productExists) {
@@ -146,12 +124,12 @@ export class ProductsManager {
                     return 'Error: amount must be higher or equal to 0';
                 }
 
-                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                const db = client.db(databaseName);
+                client = await MongoClient.connect(Database.mongoUrl, Database.mongoClientOptions);
+                const db = client.db(Database.databaseName);
                 const query = { name: name };
                 const updatedProduct = { $set: { amount: newAmount }};
 
-                const { matchedCount } = await db.collection("products").updateOne(query, updatedProduct);
+                const { matchedCount } = await db.collection(Database.productsSchema.title).updateOne(query, updatedProduct);
                 if (matchedCount === 0) {
                     _lastStatus = Status.NOT_FOUND;
                     return 'Error: product not found.';
@@ -186,10 +164,10 @@ export class ProductsManager {
                     return 'Error: product name is required.';
                 }
 
-                client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
-                const db = client.db(databaseName);
+                client = await MongoClient.connect(Database.mongoUrl, Database.mongoClientOptions);
+                const db = client.db(Database.databaseName);
                 const query = { name: name };
-                const { deletedCount } = await db.collection("products").deleteOne(query);
+                const { deletedCount } = await db.collection(Database.productsSchema.title).deleteOne(query);
                 if (deletedCount === 0) {
                     _lastStatus = Status.NOT_FOUND;
                     return 'Error: product not found.';

@@ -13,7 +13,7 @@ app.get('/api/products', async (req, res) => {
   const products = await manager.getProducts();
   const answer = products.length == 0 ? "No products available" : products;
   res.status(manager.getLastStatus()).json(answer);
-  console.log("API get invoked successfully.");
+  console.log("API get invoked.");
 });
 
 
@@ -25,7 +25,7 @@ app.post('/api/products', async (req, res) => {
     const answer = await manager.addProduct(name, description, category, amount) || 
     `Product '${name}' with description '${description}' of category '${category}' has been added successfully with amount of '${amount || 0}'!`;
     res.status(manager.getLastStatus()).json(answer);
-    console.log("API post invoked successfully.");
+    console.log("API post invoked.");
 });
 
 
@@ -36,7 +36,7 @@ app.put('/api/products/:name', async (req, res) => {
 
     const answer = await manager.updateAmount(productName, newAmount) || `Product: '${productName}' amount has been updated successfully to '${newAmount}!'`;
     res.status(manager.getLastStatus()).json(answer);
-    console.log("API put invoked successfully.");
+    console.log("API put invoked.");
   });
 
   
@@ -46,7 +46,7 @@ app.delete('/api/products/:name', async (req, res) => {
 
     const answer = await manager.deleteProduct(productName) || `Product: '${productName} has been deleted successfully!`;
     res.status(manager.getLastStatus()).json(answer);
-    console.log("API delete invoked successfully.");
+    console.log("API delete invoked.");
   });
 
 
