@@ -1,4 +1,5 @@
 import { Product } from './Product.mjs';
+import { Status } from './Status.mjs';
 import pkg from 'mongodb';
 const { MongoClient, MongoError } = pkg;
 
@@ -26,15 +27,6 @@ let mongoClientOptions = { useNewUrlParser: true, useUnifiedTopology: true };
 let databaseName = "my-db";
 
 
-// Status numbers:
-const status_OK = 200;
-const status_Created = 201;
-const status_BadRequest = 400;
-const status_NotFound = 404;
-const status_InternalServerError = 500;
-
-
-
 // Singleton class used for managing products. Using mongodb docker to save data.
 export class ProductsManager {
     static #instance = null;
@@ -48,7 +40,7 @@ export class ProductsManager {
             throw new Error("Singleton: Can't create more then 1 instance! Use GetInstance instead.")
         }
         
-        let _lastStatus = status_OK;
+        let _lastStatus = Status.OK;
         ProductsManager.#instance = this;
 
         (async () => {
@@ -79,12 +71,12 @@ export class ProductsManager {
             try {
                 client = await MongoClient.connect(mongoUrlLocal, mongoClientOptions);
                 const db = client.db(databaseName);
-                _lastStatus = status_OK;
+                _lastStatus = Status.OK;
                 const results = await db.collection("products").find({}, { projection: { _id: 0 } }).toArray();
                 const products = results.map(data => new Product(data.name, data.description, data.category, data.amount));
                 return products;
             } catch (err) {
-                _lastStatus = status_InternalServerError;
+                _lastStatus = Status.INTERNAL_SERVER_ERROR;
                 console.error("Error occured: ", err);
                 if (err instanceof MongoError) {
                     return "MongoDB error: " + err.message;
@@ -103,11 +95,11 @@ export class ProductsManager {
             let client;
             try {
                 if (!name || !description || !category) {
-                    _lastStatus = status_BadRequest;
+                    _lastStatus = Status.BAD_REQUEST;
                     return 'Error: name, description, and category are required.';
                 }
                 if (amount != undefined && amount < 0) {
-                    _lastStatus = status_BadRequest;
+                    _lastStatus = Status.BAD_REQUEST;
                     return 'Error: amount must be higher or equal to 0';
                 }
                 
@@ -117,13 +109,13 @@ export class ProductsManager {
 
                 const productExists = await collection.findOne({ name: name });
                 if (productExists) {
-                    _lastStatus = status_BadRequest;
+                    _lastStatus = Status.BAD_REQUEST;
                     return 'Error: product with this name already exists.';
                 } 
                 await collection.insertOne(new Product(name, description, category, amount));
 
             } catch (err) {
-                _lastStatus = status_InternalServerError;
+                _lastStatus = Status.INTERNAL_SERVER_ERROR;
                 console.error("Error occured: ", err);
                 if (err instanceof MongoError) {
                     answer = "MongoDB error: " + err.message;
@@ -135,7 +127,7 @@ export class ProductsManager {
                     client.close();
                 }
             }
-            _lastStatus = status_Created;
+            _lastStatus = Status.CREATED;
             return undefined;
         }
 
@@ -146,11 +138,11 @@ export class ProductsManager {
             let client;
             try {
                 if (!name || newAmount == undefined) {
-                    _lastStatus = status_BadRequest;
+                    _lastStatus = Status.BAD_REQUEST;
                     return 'Error: name and amount are required.';
                 }
                 if (newAmount != undefined && newAmount < 0) {
-                    _lastStatus = status_BadRequest;
+                    _lastStatus = Status.BAD_REQUEST;
                     return 'Error: amount must be higher or equal to 0';
                 }
 
@@ -161,12 +153,12 @@ export class ProductsManager {
 
                 const { matchedCount } = await db.collection("products").updateOne(query, updatedProduct);
                 if (matchedCount === 0) {
-                    _lastStatus = status_NotFound;
+                    _lastStatus = Status.NOT_FOUND;
                     return 'Error: product not found.';
                 }
 
             } catch (err) {
-                _lastStatus = status_InternalServerError;
+                _lastStatus = Status.INTERNAL_SERVER_ERROR;
                 console.error("Error occured: ", err);
                 if (err instanceof MongoError) {
                     return "MongoDB error: " + err.message;
@@ -178,7 +170,7 @@ export class ProductsManager {
                     client.close();
                 }                
             }
-            _lastStatus = status_OK;
+            _lastStatus = Status.OK;
             return undefined;
         }
 
@@ -190,7 +182,7 @@ export class ProductsManager {
             { 
                 if (!name)
                 {
-                    _lastStatus = status_BadRequest;
+                    _lastStatus = Status.BAD_REQUEST;
                     return 'Error: product name is required.';
                 }
 
@@ -199,11 +191,11 @@ export class ProductsManager {
                 const query = { name: name };
                 const { deletedCount } = await db.collection("products").deleteOne(query);
                 if (deletedCount === 0) {
-                    _lastStatus = status_NotFound;
+                    _lastStatus = Status.NOT_FOUND;
                     return 'Error: product not found.';
                 }
             } catch (err) {
-                _lastStatus = status_InternalServerError;
+                _lastStatus = Status.INTERNAL_SERVER_ERROR;
                 console.error("Error occured: ", err);
                 if (err instanceof MongoError) {
                     return "MongoDB error: " + err.message;
@@ -214,7 +206,7 @@ export class ProductsManager {
                 if (client) {
                     client.close();
                 }                }
-            _lastStatus = status_OK;
+            _lastStatus = Status.OK;
             return undefined;
         }
     }  
